@@ -14,7 +14,7 @@ cd $LIBUSB_SOURCE_DIR
 git checkout v1.0.19
 git apply $DEPENDS_DIR/linux_usbfs_increase_max_iso_buffer_length.patch
 ./bootstrap.sh
-./configure --prefix=$LIBUSB_INSTALL_DIR
+./configure CC=cc --prefix=$LIBUSB_INSTALL_DIR
 make && make install
 
 cd $DEPENDS_DIR
