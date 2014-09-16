@@ -147,10 +147,6 @@ ENDIF("${LIBFREENECT2_THREADING}" MATCHES "tinythread")
 INSTALL(FILES 
   ${PROJECT_BINARY_DIR}/freenect2Config.cmake DESTINATION lib/cmake/freenect2/)
 
-if(APPLE)
-  INSTALL_FILES(/ FILES "${DEPENDS_DIR}/libjpeg_turbo/")
-endif()
-
 #set_target_properties(Protonect PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
 #install(TARGETS Protonect freenect2
 #        RUNTIME DESTINATION bin
