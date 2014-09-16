@@ -122,7 +122,7 @@ ADD_EXECUTABLE(test_opengl
 )
 
 TARGET_LINK_LIBRARIES(test_opengl
-  freenect2
+  freenect2 
 )
   
 ADD_EXECUTABLE(Protonect
@@ -133,15 +133,29 @@ TARGET_LINK_LIBRARIES(Protonect
   freenect2
 )
 
-set_target_properties(Protonect PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
-install(TARGETS Protonect freenect2
-        RUNTIME DESTINATION bin
-        LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib)
+CONFIGURE_FILE(freenect2.cmake.in
+  "${PROJECT_BINARY_DIR}/freenect2Config.cmake" @ONLY)
 
-install_files(/include/${PROJECT_NAME} FILES include/${PROJECT_NAME}/libfreenect2.hpp include/${PROJECT_NAME}/frame_listener.hpp)
-install_files(/ FILES "${DEPENDS_DIR}/libusb/")
-install_files(/ FILES "${DEPENDS_DIR}/glew/")
-if(APPLE)
-  install_files(/ FILES "${DEPENDS_DIR}/libjpeg_turbo/")
-endif()
+INSTALL(TARGETS 
+  freenect2 DESTINATION lib)
+INSTALL(DIRECTORY 
+  "${MY_DIR}/include/" DESTINATION include)
+IF("${LIBFREENECT2_THREADING}" MATCHES "tinythread")
+  INSTALL(FILES 
+    "${MY_DIR}/src/tinythread/tinythread.h" DESTINATION include/${PROJECT_NAME}/tinythread/)
+ENDIF("${LIBFREENECT2_THREADING}" MATCHES "tinythread")
+INSTALL(FILES 
+  ${PROJECT_BINARY_DIR}/freenect2Config.cmake DESTINATION lib/cmake/freenect2/)
+
+#set_target_properties(Protonect PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
+#install(TARGETS Protonect freenect2
+#        RUNTIME DESTINATION bin
+#        LIBRARY DESTINATION lib
+#        ARCHIVE DESTINATION lib)
+#
+#install_files(/include/${PROJECT_NAME} FILES include/${PROJECT_NAME}/libfreenect2.hpp #include/${PROJECT_NAME}/frame_listener.hpp)
+#install_files(/ FILES "${DEPENDS_DIR}/libusb/")
+#install_files(/ FILES "${DEPENDS_DIR}/glew/")
+#if(APPLE)
+#  install_files(/ FILES "${DEPENDS_DIR}/libjpeg_turbo/")
+#endif()
