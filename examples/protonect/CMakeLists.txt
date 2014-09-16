@@ -2,8 +2,10 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
 
 PROJECT(libfreenect2)
 SET(CMAKE_BUILD_TYPE RelWithDebInfo)
+set(CMAKE_CXX_FLAGS "-std=c++0x ${CMAKE_CXX_FLAGS}")
 
 SET(MY_DIR ${libfreenect2_SOURCE_DIR})
+SET(DEPENDS_DIR "${libfreenect2_SOURCE_DIR}/../../depends")
 
 # additional cmake modules
 LIST(APPEND CMAKE_MODULE_PATH ${MY_DIR}/cmake_modules)
@@ -22,20 +24,21 @@ SET(LIBRARY_OUTPUT_PATH ${MY_DIR}/lib)
 
 # dependencies
 FIND_PACKAGE(OpenCV REQUIRED)
+find_library(OPENCL_LIBRARIES OpenCL)
 
 # OpenCV
 INCLUDE_DIRECTORIES(${OpenCV_INCLUDE_DIR})
 
 # LibUSB
-INCLUDE_DIRECTORIES("${MY_DIR}/../../depends/libusb/include/libusb-1.0/")
-LINK_DIRECTORIES("${MY_DIR}/../../depends/libusb/lib/")
+INCLUDE_DIRECTORIES("${DEPENDS_DIR}/libusb/include/libusb-1.0/")
+LINK_DIRECTORIES("${DEPENDS_DIR}/libusb/lib/")
 
 # GLEW
-INCLUDE_DIRECTORIES("${MY_DIR}/../../depends/glew/include/")
+INCLUDE_DIRECTORIES("${DEPENDS_DIR}/glew/include/")
 if (APPLE)
-  LINK_DIRECTORIES("${MY_DIR}/../../depends/glew/lib/")
+  LINK_DIRECTORIES("${DEPENDS_DIR}/glew/lib/")
 else()
-  LINK_DIRECTORIES("${MY_DIR}/../../depends/glew/lib64/")
+  LINK_DIRECTORIES("${DEPENDS_DIR}/glew/lib64/")
 endif()
 ADD_DEFINITIONS(-DGLEW_MX -DGLEW_STATIC)
 
@@ -45,14 +48,19 @@ SET(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "Build the GLFW example programs")
 SET(GLFW_BUILD_TESTS OFF CACHE BOOL "Build the GLFW test programs")
 SET(GLFW_BUILD_DOCS OFF CACHE BOOL "Build the GLFW documentation")
 
-ADD_SUBDIRECTORY(${MY_DIR}/../../depends/glfw_src/ ${MY_DIR}/../../depends/glfw)
-INCLUDE_DIRECTORIES(${MY_DIR}/../../depends/glfw_src/include/)
+ADD_SUBDIRECTORY(${DEPENDS_DIR}/glfw_src/ ${DEPENDS_DIR}/glfw)
+INCLUDE_DIRECTORIES(${DEPENDS_DIR}/glfw_src/include/)
 
-if (APPLE)
+if(APPLE)
   # libjpeg-turbo
-  INCLUDE_DIRECTORIES("${MY_DIR}/../../depends/libjpeg_turbo/include/")
-  LINK_DIRECTORIES("${MY_DIR}/../../depends/libjpeg_turbo/lib/")
+  INCLUDE_DIRECTORIES("${DEPENDS_DIR}/libjpeg_turbo/include/")
+  LINK_DIRECTORIES("${DEPENDS_DIR}/libjpeg_turbo/lib/")
 endif()
+
+# Display additional files in qtcreator
+execute_process(COMMAND find ${PROJECT_SOURCE_DIR} -type f -name "*.*" OUTPUT_VARIABLE FILES_ALL_STRING)
+string(REPLACE "\n" ";" FILES_ALL_LIST ${FILES_ALL_STRING})
+add_custom_target(additional_files SOURCES ${FILES_ALL_LIST})
 
 SET(RESOURCES_INC_FILE "${MY_DIR}/src/resources.inc")
 GENERATE_RESOURCES(${RESOURCES_INC_FILE} ${MY_DIR} 
@@ -65,7 +73,9 @@ GENERATE_RESOURCES(${RESOURCES_INC_FILE} ${MY_DIR}
   src/shader/filter2.fs
   src/shader/stage1.fs
   src/shader/stage2.fs
+  src/opencl_depth_packet_processor.cl
 )
+add_definitions(-DREG_OPENCL_FILE="src/opencl_depth_packet_processor.cl")
 
 INCLUDE_DIRECTORIES("${MY_DIR}/include")
 
@@ -86,6 +96,7 @@ ADD_LIBRARY(freenect2 SHARED
   src/depth_packet_processor.cpp
   src/cpu_depth_packet_processor.cpp
   src/opengl_depth_packet_processor.cpp
+  src/opencl_depth_packet_processor.cpp
   src/resource.cpp
   
   src/usb_control.cpp
@@ -103,6 +114,7 @@ TARGET_LINK_LIBRARIES(freenect2
   GLEWmx
   glfw
   ${GLFW_LIBRARIES}
+  ${OPENCL_LIBRARIES}
 )
 
 ADD_EXECUTABLE(test_opengl
@@ -121,16 +133,15 @@ TARGET_LINK_LIBRARIES(Protonect
   freenect2
 )
 
-CONFIGURE_FILE(freenect2.cmake.in
-  "${PROJECT_BINARY_DIR}/freenect2Config.cmake" @ONLY)
+set_target_properties(Protonect PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
+install(TARGETS Protonect freenect2
+        RUNTIME DESTINATION bin
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib)
 
-INSTALL(TARGETS 
-  freenect2 DESTINATION lib)
-INSTALL(DIRECTORY 
-  "${MY_DIR}/include/" DESTINATION include)
-IF("${LIBFREENECT2_THREADING}" MATCHES "tinythread")
-  INSTALL(FILES 
-    "${MY_DIR}/src/tinythread/tinythread.h" DESTINATION include/${PROJECT_NAME}/tinythread/)
-ENDIF("${LIBFREENECT2_THREADING}" MATCHES "tinythread")
-INSTALL(FILES 
-  freenect2Config.cmake DESTINATION lib/cmake/freenect2/)
+install_files(/include/${PROJECT_NAME} FILES include/${PROJECT_NAME}/libfreenect2.hpp include/${PROJECT_NAME}/frame_listener.hpp)
+install_files(/ FILES "${DEPENDS_DIR}/libusb/")
+install_files(/ FILES "${DEPENDS_DIR}/glew/")
+if(APPLE)
+  install_files(/ FILES "${DEPENDS_DIR}/libjpeg_turbo/")
+endif()
