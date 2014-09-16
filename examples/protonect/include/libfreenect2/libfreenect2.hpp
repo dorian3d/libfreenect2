@@ -32,6 +32,8 @@
 namespace libfreenect2
 {
 
+extern const bool VERBOSE;
+
 class Freenect2Device
 {
 public:

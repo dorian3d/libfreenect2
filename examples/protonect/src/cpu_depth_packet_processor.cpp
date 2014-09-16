@@ -35,6 +35,8 @@
 namespace libfreenect2
 {
 
+extern const bool VERBOSE;
+
 bool loadBufferFromFile2(const std::string& filename, unsigned char *buffer, size_t n)
 {
   bool success = true;
@@ -104,8 +106,12 @@ public:
 
     if(timing_acc_n >= 100.0)
     {
-      double avg = (timing_acc / timing_acc_n);
-      std::cout << "[CpuDepthPacketProcessor] avg. time: " << (avg * 1000) << "ms -> ~" << (1.0/avg) << "Hz" << std::endl;
+      if(VERBOSE)
+      {
+        double avg = (timing_acc / timing_acc_n);
+        std::cout << "[CpuDepthPacketProcessor] avg. time: " << (avg * 1000)
+                  << "ms -> ~" << (1.0/avg) << "Hz" << std::endl;
+      }
       timing_acc = 0.0;
       timing_acc_n = 0.0;
     }

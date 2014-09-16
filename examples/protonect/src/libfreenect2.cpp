@@ -47,7 +47,7 @@ using namespace libfreenect2;
 using namespace libfreenect2::usb;
 using namespace libfreenect2::protocol;
 
-static const bool VERBOSE = false;
+const bool VERBOSE = false;
 
 class Freenect2DeviceImpl : public Freenect2Device
 {
