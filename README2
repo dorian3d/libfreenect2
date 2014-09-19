@@ -1,0 +1,3 @@
+OpenCL version.
+Some version of clang < 6 may not be able to compile because it does not recognize keyword thread_local.
+If the header OpenCL/cl.hpp is not found, make sure you have a copy from http://www.khronos.org/registry/cl/api/1.2/cl.hpp

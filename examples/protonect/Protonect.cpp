@@ -83,7 +83,7 @@ int main(int argc, char *argv[])
   std::cout << "device firmware: " << dev->getFirmwareVersion() << std::endl;
 
   // align depth and rgb image
-  DepthRegistration *depthReg;
+  DepthRegistration *depthReg = NULL;
   bool bflag = false;
 
   while(!shutdown)
@@ -150,6 +150,8 @@ int main(int argc, char *argv[])
   // TODO: bad things will happen, if frame listeners are freed before dev->stop() :(
   dev->stop();
   dev->close();
+
+  delete depthReg;
 
   return 0;
 }

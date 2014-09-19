@@ -27,15 +27,9 @@ FIND_PACKAGE(OpenCV REQUIRED)
 FIND_PACKAGE(Eigen3 REQUIRED)
 find_library(OPENCL_LIBRARIES OpenCL)
 
-#if(Eigen3_FOUND)
-  message(STATUS "CPU based depth registration enabled")
-  set(DEPTH_REG_CPU ON)
-  add_definitions(-DDEPTH_REG_CPU)
-#else()
-#  message(STATUS "CPU based depth registration disabled")
-#  set(DEPTH_REG_CPU OFF)
-#endif()
-
+message(STATUS "CPU based depth registration enabled")
+set(DEPTH_REG_CPU ON)
+add_definitions(-DDEPTH_REG_CPU)
 
 if(OPENCL_LIBRARIES)
   message(STATUS "OpenCL based depth registration enabled")
@@ -49,7 +43,6 @@ endif()
 # OpenCV
 INCLUDE_DIRECTORIES(${OpenCV_INCLUDE_DIR})
 INCLUDE_DIRECTORIES(${Eigen3_INCLUDE_DIRS})
-
 
 # LibUSB
 INCLUDE_DIRECTORIES("${DEPENDS_DIR}/libusb/include/libusb-1.0/")
@@ -99,7 +92,7 @@ GENERATE_RESOURCES(${RESOURCES_INC_FILE} ${MY_DIR}
 )
 add_definitions(-DREG_OPENCL_FILE="src/opencl_depth_packet_processor.cl")
 
-INCLUDE_DIRECTORIES("${MY_DIR}/include" )
+INCLUDE_DIRECTORIES("${MY_DIR}/include")
 
 ADD_DEFINITIONS(-DRESOURCES_INC)
 ADD_LIBRARY(freenect2 SHARED
