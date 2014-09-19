@@ -24,10 +24,32 @@ SET(LIBRARY_OUTPUT_PATH ${MY_DIR}/lib)
 
 # dependencies
 FIND_PACKAGE(OpenCV REQUIRED)
+FIND_PACKAGE(Eigen3 REQUIRED)
 find_library(OPENCL_LIBRARIES OpenCL)
+
+#if(Eigen3_FOUND)
+  message(STATUS "CPU based depth registration enabled")
+  set(DEPTH_REG_CPU ON)
+  add_definitions(-DDEPTH_REG_CPU)
+#else()
+#  message(STATUS "CPU based depth registration disabled")
+#  set(DEPTH_REG_CPU OFF)
+#endif()
+
+
+if(OPENCL_LIBRARIES)
+  message(STATUS "OpenCL based depth registration enabled")
+  set(DEPTH_REG_OPENCL ON)
+  add_definitions(-DDEPTH_REG_OPENCL)
+else()
+  message(STATUS "OpenCL based depth registration disabled")
+  set(DEPTH_REG_OPENCL OFF)
+endif()
 
 # OpenCV
 INCLUDE_DIRECTORIES(${OpenCV_INCLUDE_DIR})
+INCLUDE_DIRECTORIES(${Eigen3_INCLUDE_DIRS})
+
 
 # LibUSB
 INCLUDE_DIRECTORIES("${DEPENDS_DIR}/libusb/include/libusb-1.0/")
@@ -77,7 +99,7 @@ GENERATE_RESOURCES(${RESOURCES_INC_FILE} ${MY_DIR}
 )
 add_definitions(-DREG_OPENCL_FILE="src/opencl_depth_packet_processor.cl")
 
-INCLUDE_DIRECTORIES("${MY_DIR}/include")
+INCLUDE_DIRECTORIES("${MY_DIR}/include" )
 
 ADD_DEFINITIONS(-DRESOURCES_INC)
 ADD_LIBRARY(freenect2 SHARED
@@ -102,6 +124,15 @@ ADD_LIBRARY(freenect2 SHARED
   src/usb_control.cpp
   src/command_transaction.cpp
   src/libfreenect2.cpp
+
+  src/depth_registration_opencl.cpp
+  src/depth_registration_cpu.cpp
+  src/depth_registration.cpp
+  src/depth_registration.cl
+
+  src/transfer_pool.cpp
+  src/event_loop.cpp
+
   ${LIBFREENECT2_THREADING_SOURCE}
   ${RESOURCES_INC_FILE}
 )
@@ -109,6 +140,7 @@ ADD_LIBRARY(freenect2 SHARED
 TARGET_LINK_LIBRARIES(freenect2
   usb-1.0
   ${OpenCV_LIBS}
+  ${Eigen3_LIBRARIES}
   turbojpeg
   ${LIBFREENECT2_THREADING_LIBRARIES}
   GLEWmx
