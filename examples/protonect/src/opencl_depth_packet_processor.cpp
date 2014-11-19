@@ -44,6 +44,8 @@
 #define REG_OPENCL_FILE ""
 #endif
 
+#define OUT_NAME(FUNCTION) "[OpenCLDepthPacketProcessor::" FUNCTION "] "
+
 namespace libfreenect2
 {
 
@@ -56,13 +58,13 @@ bool loadBufferFromResources(const std::string &filename, unsigned char *buffer,
 
   if(!loadResource(filename, &data, &length))
   {
-    std::cerr << "failed to load resource: " << filename << std::endl;
+    std::cerr << OUT_NAME("loadBufferFromResources") "failed to load resource: " << filename << std::endl;
     return false;
   }
 
   if(length != n)
   {
-    std::cerr << "wrong size of resource: " << filename << std::endl;
+    std::cerr << OUT_NAME("loadBufferFromResources") "wrong size of resource: " << filename << std::endl;
     return false;
   }
 
@@ -77,7 +79,7 @@ std::string loadCLSource(const std::string &filename)
 
   if(!loadResource(filename, &data, &length))
   {
-    std::cerr << "failed to load cl source!" << std::endl;
+    std::cerr << OUT_NAME("loadCLSource") "failed to load cl source!" << std::endl;
     return "";
   }
 
@@ -104,8 +106,7 @@ public:
   Frame *ir_frame, *depth_frame;
 
   cl::Context context;
-  std::vector<cl::Platform> platforms;
-  std::vector<cl::Device> devices;
+  cl::Device device;
 
   cl::Program program;
   cl::CommandQueue queue;
@@ -222,6 +223,46 @@ public:
     options = oss.str();
   }
 
+  bool selectDevice(const std::vector<cl::Platform> &platforms, const int type)
+  {
+    bool selected = false;
+
+    for(size_t i = 0; i < platforms.size(); ++i)
+    {
+      const cl::Platform &platform = platforms[i];
+      std::string platformName, platformVendor;
+      platform.getInfo(CL_PLATFORM_NAME, &platformName);
+      platform.getInfo(CL_PLATFORM_VENDOR, &platformVendor);
+
+      std::cout << OUT_NAME("selectDevice") "found platform: " << platformName << " vendor: " << platformVendor << std::endl;
+
+      std::vector<cl::Device> devices;
+      if(platform.getDevices(type, &devices) != CL_SUCCESS)
+      {
+        std::cerr << OUT_NAME("selectDevice") "error while getting opencl devices." << std::endl;
+        return false;
+      }
+
+      for(size_t j = 0; j < devices.size(); ++j)
+      {
+        cl::Device &dev = devices[i];
+        std::string devName, devVendor;
+        dev.getInfo(CL_DEVICE_NAME, &devName);
+        dev.getInfo(CL_DEVICE_VENDOR, &devVendor);
+
+        std::cout << OUT_NAME("selectDevice") "found device: " << devName << " vendor: " << devVendor << std::endl;
+
+        if(!selected)
+        {
+          selected = true;
+          device = dev;
+        }
+      }
+    }
+
+    return selected;
+  }
+
   bool init()
   {
     if(isInitialized)
@@ -238,26 +279,38 @@ public:
     cl_int err = CL_SUCCESS;
     try
     {
-      cl::Platform::get(&platforms);
-      if(platforms.size() == 0)
+      std::vector<cl::Platform> platforms;
+      if(cl::Platform::get(&platforms) != CL_SUCCESS)
       {
-        std::cerr << "Platform size 0" << std::endl;
+        std::cerr << OUT_NAME("init") "error while getting opencl platforms." << std::endl;
+        return false;
+      }
+      if(platforms.empty())
+      {
+        std::cerr << OUT_NAME("init") "no opencl platforms found." << std::endl;
         return false;
       }
 
-      cl_context_properties properties[] = { CL_CONTEXT_PLATFORM, (cl_context_properties)(platforms[0])(), 0};
-      context = cl::Context(CL_DEVICE_TYPE_GPU, properties);
+      if(!selectDevice(platforms, CL_DEVICE_TYPE_GPU))
+      {
+        std::cout << OUT_NAME("init") "could not find any GPU device. trying CPU devices" << std::endl;
 
-      devices = context.getInfo<CL_CONTEXT_DEVICES>();
+        if(!selectDevice(platforms, CL_DEVICE_TYPE_CPU))
+        {
+          std::cerr << OUT_NAME("init") "could not find any suitable device" << std::endl;
+          return false;
+        }
+      }
+      context = cl::Context(device);
 
       std::string options;
       generateOptions(options);
 
       cl::Program::Sources source(1, std::make_pair(sourceCode.c_str(), sourceCode.length()));
       program = cl::Program(context, source);
-      program.build(devices, options.c_str());
+      program.build(options.c_str());
 
-      queue = cl::CommandQueue(context, devices[0], 0, &err);
+      queue = cl::CommandQueue(context, device, 0, &err);
 
       //Read only
       buf_lut11to16_size = 2048 * sizeof(cl_short);
@@ -340,13 +393,13 @@ public:
     }
     catch(const cl::Error &err)
     {
-      std::cerr << "ERROR: " << err.what() << "(" << err.err() << ")" << std::endl;
+      std::cerr << OUT_NAME("init") "ERROR: " << err.what() << "(" << err.err() << ")" << std::endl;
 
       if(err.err() == CL_BUILD_PROGRAM_FAILURE)
       {
-        std::cout << "Build Status: " << program.getBuildInfo<CL_PROGRAM_BUILD_STATUS>(devices[0]) << std::endl;
-        std::cout << "Build Options:\t" << program.getBuildInfo<CL_PROGRAM_BUILD_OPTIONS>(devices[0]) << std::endl;
-        std::cout << "Build Log:\t " << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(devices[0]) << std::endl;
+        std::cout << OUT_NAME("init") "Build Status: " << program.getBuildInfo<CL_PROGRAM_BUILD_STATUS>(device) << std::endl;
+        std::cout << OUT_NAME("init") "Build Options:\t" << program.getBuildInfo<CL_PROGRAM_BUILD_OPTIONS>(device) << std::endl;
+        std::cout << OUT_NAME("init") "Build Log:\t " << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device) << std::endl;
       }
 
       throw err;
@@ -394,7 +447,7 @@ public:
     }
     catch(const cl::Error &err)
     {
-      std::cerr << "ERROR: " << err.what() << " (" << err.err() << ")" << std::endl;
+      std::cerr << OUT_NAME("run") "ERROR: " << err.what() << " (" << err.err() << ")" << std::endl;
       throw err;
       return;
     }
@@ -402,7 +455,7 @@ public:
 
   bool readProgram(std::string &source) const
   {
-    source = loadCLSource(REG_OPENCL_FILE);
+    source = loadCLSource("src/opencl_depth_packet_processor.cl");
     return !source.empty();
   }
 
@@ -483,7 +536,7 @@ void OpenCLDepthPacketProcessor::loadP0TablesFromCommandResponse(unsigned char *
 
   if(buffer_length < sizeof(libfreenect2::protocol::P0TablesResponse))
   {
-    std::cerr << "[CpuDepthPacketProcessor::loadP0TablesFromCommandResponse] P0Table response too short!" << std::endl;
+    std::cerr << OUT_NAME("loadP0TablesFromCommandResponse") "P0Table response too short!" << std::endl;
     return;
   }
 
@@ -495,7 +548,7 @@ void OpenCLDepthPacketProcessor::loadXTableFromFile(const char *filename)
 {
   if(!loadBufferFromResources(filename, (unsigned char *)impl_->x_table, impl_->image_size * sizeof(float)))
   {
-    std::cerr << "could not load x table from: " << filename << std::endl;
+    std::cerr << OUT_NAME("loadXTableFromFile") "could not load x table from: " << filename << std::endl;
   }
 }
 
@@ -503,7 +556,7 @@ void OpenCLDepthPacketProcessor::loadZTableFromFile(const char *filename)
 {
   if(!loadBufferFromResources(filename, (unsigned char *)impl_->z_table, impl_->image_size * sizeof(float)))
   {
-    std::cerr << "could not load z table from: " << filename << std::endl;
+    std::cerr << OUT_NAME("loadZTableFromFile") "could not load z table from: " << filename << std::endl;
   }
 }
 
@@ -511,7 +564,7 @@ void OpenCLDepthPacketProcessor::load11To16LutFromFile(const char *filename)
 {
   if(!loadBufferFromResources(filename, (unsigned char *)impl_->lut11to16, 2048 * sizeof(cl_ushort)))
   {
-    std::cerr << "could not load lut table from: " << filename << std::endl;
+    std::cerr << OUT_NAME("load11To16LutFromFile") "could not load lut table from: " << filename << std::endl;
   }
 }
 
@@ -521,7 +574,7 @@ void OpenCLDepthPacketProcessor::process(const DepthPacket &packet)
 
   if(!impl_->init())
   {
-    std::cerr << "could not initialize OpenCLDepthPacketProcessor" << std::endl;
+    std::cerr << OUT_NAME("process") "could not initialize OpenCLDepthPacketProcessor" << std::endl;
     return;
   }
 

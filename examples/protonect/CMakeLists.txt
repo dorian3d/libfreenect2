@@ -2,10 +2,24 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
 
 PROJECT(libfreenect2)
 SET(CMAKE_BUILD_TYPE RelWithDebInfo)
-set(CMAKE_CXX_FLAGS "-std=c++0x ${CMAKE_CXX_FLAGS}")
 
 SET(MY_DIR ${libfreenect2_SOURCE_DIR})
-SET(DEPENDS_DIR "${libfreenect2_SOURCE_DIR}/../../depends")
+
+OPTION(ENABLE_CXX11 "Enable C++11 support" OFF)
+OPTION(ENABLE_OPENCL "Enable OpenCL support" ON)
+
+IF(ENABLE_CXX11)
+  INCLUDE(CheckCXXCompilerFlag)
+  CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
+  CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
+  IF(COMPILER_SUPPORTS_CXX11)
+	SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+  ELSEIF(COMPILER_SUPPORTS_CXX0X)
+	SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
+  ELSE()
+    MESSAGE(STATUS "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
+  ENDIF()
+ENDIF(ENABLE_CXX11)
 
 # additional cmake modules
 LIST(APPEND CMAKE_MODULE_PATH ${MY_DIR}/cmake_modules)
@@ -21,6 +35,8 @@ SET(EXECUTABLE_OUTPUT_PATH ${MY_DIR}/bin)
 
 #set the default path for built libraries to the "lib" directory
 SET(LIBRARY_OUTPUT_PATH ${MY_DIR}/lib)
+
+FIND_PACKAGE(OpenCL)
 
 # dependencies
 FIND_PACKAGE(OpenCV REQUIRED)
@@ -45,15 +61,15 @@ INCLUDE_DIRECTORIES(${OpenCV_INCLUDE_DIR})
 INCLUDE_DIRECTORIES(${Eigen3_INCLUDE_DIRS})
 
 # LibUSB
-INCLUDE_DIRECTORIES("${DEPENDS_DIR}/libusb/include/libusb-1.0/")
-LINK_DIRECTORIES("${DEPENDS_DIR}/libusb/lib/")
+INCLUDE_DIRECTORIES("${MY_DIR}/../../depends/libusb/include/libusb-1.0/")
+LINK_DIRECTORIES("${MY_DIR}/../../depends/libusb/lib/")
 
 # GLEW
-INCLUDE_DIRECTORIES("${DEPENDS_DIR}/glew/include/")
+INCLUDE_DIRECTORIES("${MY_DIR}/../../depends/glew/include/")
 if (APPLE)
-  LINK_DIRECTORIES("${DEPENDS_DIR}/glew/lib/")
+  LINK_DIRECTORIES("${MY_DIR}/../../depends/glew/lib/")
 else()
-  LINK_DIRECTORIES("${DEPENDS_DIR}/glew/lib64/")
+  LINK_DIRECTORIES("${MY_DIR}/../../depends/glew/lib64/")
 endif()
 ADD_DEFINITIONS(-DGLEW_MX -DGLEW_STATIC)
 
@@ -63,13 +79,13 @@ SET(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "Build the GLFW example programs")
 SET(GLFW_BUILD_TESTS OFF CACHE BOOL "Build the GLFW test programs")
 SET(GLFW_BUILD_DOCS OFF CACHE BOOL "Build the GLFW documentation")
 
-ADD_SUBDIRECTORY(${DEPENDS_DIR}/glfw_src/ ${DEPENDS_DIR}/glfw)
-INCLUDE_DIRECTORIES(${DEPENDS_DIR}/glfw_src/include/)
+ADD_SUBDIRECTORY(${MY_DIR}/../../depends/glfw_src/ ${MY_DIR}/../../depends/glfw)
+INCLUDE_DIRECTORIES(${MY_DIR}/../../depends/glfw_src/include/)
 
 if(APPLE)
   # libjpeg-turbo
-  INCLUDE_DIRECTORIES("${DEPENDS_DIR}/libjpeg_turbo/include/")
-  LINK_DIRECTORIES("${DEPENDS_DIR}/libjpeg_turbo/lib/")
+  INCLUDE_DIRECTORIES("${MY_DIR}/../../depends/libjpeg_turbo/include/")
+  LINK_DIRECTORIES("${MY_DIR}/../../depends/libjpeg_turbo/lib/")
 endif()
 
 # Display additional files in qtcreator
@@ -78,30 +94,14 @@ string(REPLACE "\n" ";" FILES_ALL_LIST ${FILES_ALL_STRING})
 add_custom_target(additional_files SOURCES ${FILES_ALL_LIST})
 
 SET(RESOURCES_INC_FILE "${MY_DIR}/src/resources.inc")
-GENERATE_RESOURCES(${RESOURCES_INC_FILE} ${MY_DIR} 
-  11to16.bin 
-  xTable.bin 
-  zTable.bin 
-  src/shader/debug.fs
-  src/shader/default.vs
-  src/shader/filter1.fs
-  src/shader/filter2.fs
-  src/shader/stage1.fs
-  src/shader/stage2.fs
-  src/opencl_depth_packet_processor.cl
-)
-add_definitions(-DREG_OPENCL_FILE="src/opencl_depth_packet_processor.cl")
 
-INCLUDE_DIRECTORIES("${MY_DIR}/include")
-
-ADD_DEFINITIONS(-DRESOURCES_INC)
-ADD_LIBRARY(freenect2 SHARED
-  src/opengl.cpp
+SET(SOURCES
   src/transfer_pool.cpp
   src/event_loop.cpp
   
   src/double_buffer.cpp
   src/frame_listener_impl.cpp
+  src/packet_pipeline.cpp
   
   src/rgb_packet_stream_parser.cpp
   src/rgb_packet_processor.cpp
@@ -130,24 +130,72 @@ ADD_LIBRARY(freenect2 SHARED
   ${RESOURCES_INC_FILE}
 )
 
-TARGET_LINK_LIBRARIES(freenect2
+SET(LIBRARIES
   usb-1.0
   ${OpenCV_LIBS}
   ${Eigen3_LIBRARIES}
   turbojpeg
   ${LIBFREENECT2_THREADING_LIBRARIES}
+)
+
+SET(RESOURCES
+  11to16.bin 
+  xTable.bin 
+  zTable.bin
+)
+
+# TODO: only append if building with opengl support
+LIST(APPEND SOURCES
+  src/opengl.cpp
+  src/opengl_depth_packet_processor.cpp
+)
+
+LIST(APPEND LIBRARIES
   GLEWmx
   glfw
   ${GLFW_LIBRARIES}
-  ${OPENCL_LIBRARIES}
 )
+
+LIST(APPEND RESOURCES
+  src/shader/debug.fs
+  src/shader/default.vs
+  src/shader/filter1.fs
+  src/shader/filter2.fs
+  src/shader/stage1.fs
+  src/shader/stage2.fs
+)
+
+IF(ENABLE_OPENCL AND OPENCL_FOUND)
+  ADD_DEFINITIONS(-DWITH_OPENCL_SUPPORT)
+  INCLUDE_DIRECTORIES(${OPENCL_INCLUDE_DIRS})
+  
+  LIST(APPEND SOURCES
+    src/opencl_depth_packet_processor.cpp
+  )
+
+  LIST(APPEND LIBRARIES
+    ${OPENCL_LIBRARIES}
+  )
+  
+  LIST(APPEND RESOURCES
+    src/opencl_depth_packet_processor.cl
+  )
+ENDIF(ENABLE_OPENCL AND OPENCL_FOUND)
+
+GENERATE_RESOURCES(${RESOURCES_INC_FILE} ${MY_DIR} ${RESOURCES})
+
+INCLUDE_DIRECTORIES("${MY_DIR}/include")
+
+ADD_DEFINITIONS(-DRESOURCES_INC)
+ADD_LIBRARY(freenect2 SHARED ${SOURCES})
+TARGET_LINK_LIBRARIES(freenect2 ${LIBRARIES})
 
 ADD_EXECUTABLE(test_opengl
   src/test_opengl_depth_packet_processor.cpp
 )
 
 TARGET_LINK_LIBRARIES(test_opengl
-  freenect2 
+  freenect2
 )
   
 ADD_EXECUTABLE(Protonect
@@ -170,17 +218,5 @@ IF("${LIBFREENECT2_THREADING}" MATCHES "tinythread")
     "${MY_DIR}/src/tinythread/tinythread.h" DESTINATION include/${PROJECT_NAME}/tinythread/)
 ENDIF("${LIBFREENECT2_THREADING}" MATCHES "tinythread")
 INSTALL(FILES 
-  ${PROJECT_BINARY_DIR}/freenect2Config.cmake DESTINATION lib/cmake/freenect2/)
-
-#set_target_properties(Protonect PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
-#install(TARGETS Protonect freenect2
-#        RUNTIME DESTINATION bin
-#        LIBRARY DESTINATION lib
-#        ARCHIVE DESTINATION lib)
-#
-#install_files(/include/${PROJECT_NAME} FILES include/${PROJECT_NAME}/libfreenect2.hpp #include/${PROJECT_NAME}/frame_listener.hpp)
-#install_files(/ FILES "${DEPENDS_DIR}/libusb/")
-#install_files(/ FILES "${DEPENDS_DIR}/glew/")
-#if(APPLE)
-#  install_files(/ FILES "${DEPENDS_DIR}/libjpeg_turbo/")
-#endif()
+  "${PROJECT_BINARY_DIR}/freenect2Config.cmake" DESTINATION lib/cmake/freenect2/)
+  

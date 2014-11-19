@@ -72,7 +72,7 @@ int main(int argc, char **argv) {
   cfg.EnableBilateralFilter = false;
   cfg.EnableEdgeAwareFilter = false;
 
-  libfreenect2::OpenGLDepthPacketProcessor processor(opengl_ctx.glfw_ctx);
+  libfreenect2::OpenGLDepthPacketProcessor processor(opengl_ctx.glfw_ctx, true);
   processor.setConfiguration(cfg);
   processor.setFrameListener(&fl);
   processor.loadP0TablesFromFiles((binpath + "../p00.bin").c_str(), (binpath + "../p01.bin").c_str(), (binpath + "../p02.bin").c_str());
@@ -88,7 +88,7 @@ int main(int argc, char **argv) {
   ref_processor.loadXTableFromFile("");
   ref_processor.loadZTableFromFile("");
 
-  libfreenect2::AsyncPacketProcessor<libfreenect2::DepthPacket, libfreenect2::DepthPacketProcessor> async(&processor);
+  libfreenect2::AsyncPacketProcessor<libfreenect2::DepthPacket> async(&processor);
 
   libfreenect2::DepthPacket p;
   p.buffer_length = 352*424*10*2;
