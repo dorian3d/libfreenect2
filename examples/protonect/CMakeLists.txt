@@ -41,20 +41,6 @@ FIND_PACKAGE(OpenCL)
 # dependencies
 FIND_PACKAGE(OpenCV REQUIRED)
 FIND_PACKAGE(Eigen3 REQUIRED)
-find_library(OPENCL_LIBRARIES OpenCL)
-
-message(STATUS "CPU based depth registration enabled")
-set(DEPTH_REG_CPU ON)
-add_definitions(-DDEPTH_REG_CPU)
-
-if(OPENCL_LIBRARIES)
-  message(STATUS "OpenCL based depth registration enabled")
-  set(DEPTH_REG_OPENCL ON)
-  add_definitions(-DDEPTH_REG_OPENCL)
-else()
-  message(STATUS "OpenCL based depth registration disabled")
-  set(DEPTH_REG_OPENCL OFF)
-endif()
 
 # OpenCV
 INCLUDE_DIRECTORIES(${OpenCV_INCLUDE_DIR})
