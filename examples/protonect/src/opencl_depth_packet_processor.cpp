@@ -234,7 +234,8 @@ public:
       platform.getInfo(CL_PLATFORM_NAME, &platformName);
       platform.getInfo(CL_PLATFORM_VENDOR, &platformVendor);
 
-      std::cout << OUT_NAME("selectDevice") "found platform: " << platformName << " vendor: " << platformVendor << std::endl;
+      if(VERBOSE)
+        std::cout << OUT_NAME("selectDevice") "found platform: " << platformName << " vendor: " << platformVendor << std::endl;
 
       std::vector<cl::Device> devices;
       if(platform.getDevices(type, &devices) != CL_SUCCESS)
@@ -250,7 +251,8 @@ public:
         dev.getInfo(CL_DEVICE_NAME, &devName);
         dev.getInfo(CL_DEVICE_VENDOR, &devVendor);
 
-        std::cout << OUT_NAME("selectDevice") "found device: " << devName << " vendor: " << devVendor << std::endl;
+        if(VERBOSE)
+          std::cout << OUT_NAME("selectDevice") "found device: " << devName << " vendor: " << devVendor << std::endl;
 
         if(!selected)
         {
